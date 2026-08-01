@@ -19,6 +19,9 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import re
+          import json
+          import urllib.parse
+          import urllib.request
 
           dockerfile = Path("Dockerfile").read_text()
           match = re.search(
@@ -31,16 +34,42 @@ jobs:
           if "latest" in dockerfile.lower():
               raise SystemExit("mutable latest image references are forbidden")
 
+          tag, expected_digest = match.group(1), "sha256:" + match.group(2)
+          query = urllib.parse.urlencode({
+              "service": "registry.docker.io",
+              "scope": "repository:nousresearch/hermes-agent:pull",
+          })
+          with urllib.request.urlopen(
+              "https://auth.docker.io/token?" + query, timeout=30
+          ) as response:
+              token = json.load(response)["token"]
+          request = urllib.request.Request(
+              f"https://registry-1.docker.io/v2/nousresearch/hermes-agent/manifests/{tag}",
+              method="HEAD",
+              headers={
+                  "Authorization": f"Bearer {token}",
+                  "Accept": "application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json",
+              },
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              registry_digest = response.headers.get("Docker-Content-Digest")
+          if registry_digest != expected_digest:
+              raise SystemExit(
+                  f"Dockerfile digest {expected_digest} does not match registry {registry_digest}"
+              )
+
           expected = [
               (Path(".env.example"), "PORT=3000"),
-              (Path("docker-compose.yml"), "${PORT:-3000}"),
+              (Path("docker-compose.yml"), '"${PORT:-3000}:${PORT:-3000}"'),
+              (Path("docker-compose.yml"), "PORT: ${PORT:-3000}"),
+              (Path("docker-compose.yml"), "http://127.0.0.1:${PORT:-3000}/api/status"),
               (Path("README.md"), "Public port | `3000`"),
               (Path("railway.toml"), 'healthcheckPath = "/api/status"'),
           ]
           for path, marker in expected:
               if marker not in path.read_text():
                   raise SystemExit(f"{path}: missing {marker!r}")
-          print(f"validated {match.group(1)}@sha256:{match.group(2)}")
+          print(f"validated {tag}@{expected_digest} against Docker Hub")
           PY
       - name: Validate shell entrypoint
         run: sh -n docker-entrypoint.sh
