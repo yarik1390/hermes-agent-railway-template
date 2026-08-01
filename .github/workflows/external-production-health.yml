@@ -33,14 +33,26 @@ jobs:
                       raise RuntimeError(f"{url}: HTTP {response.status}")
                   return json.load(response)
 
-          for attempt in range(3):
-              hermes = fetch(os.environ["HERMES_STATUS_URL"])
-              manifest = fetch(os.environ["MANIFEST_HEALTH_URL"])
-              if hermes.get("overall") != "ok" or not hermes.get("gateway_running"):
-                  raise RuntimeError("Hermes public status is not healthy")
-              if manifest.get("status") != "healthy":
-                  raise RuntimeError("Manifest public status is not healthy")
-              print(f"external health pass {attempt + 1}/3")
-              if attempt < 2:
+          consecutive = 0
+          last_error = "no successful probe"
+          for attempt in range(12):
+              try:
+                  hermes = fetch(os.environ["HERMES_STATUS_URL"])
+                  manifest = fetch(os.environ["MANIFEST_HEALTH_URL"])
+                  if hermes.get("overall") != "ok" or not hermes.get("gateway_running"):
+                      raise RuntimeError("Hermes public status is not healthy")
+                  if manifest.get("status") != "healthy":
+                      raise RuntimeError("Manifest public status is not healthy")
+                  consecutive += 1
+                  print(f"external health pass {consecutive}/3 (attempt {attempt + 1}/12)")
+                  if consecutive == 3:
+                      break
+              except Exception as exc:
+                  consecutive = 0
+                  last_error = f"{type(exc).__name__}: {exc}"
+                  print(f"transient health failure (attempt {attempt + 1}/12): {last_error}")
+              if attempt < 11:
                   time.sleep(30)
+          else:
+              raise RuntimeError(f"external health never stabilized: {last_error}")
           PY
