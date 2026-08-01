@@ -9,10 +9,10 @@ Deploy [Hermes Agent](https://github.com/NousResearch/hermes-agent) on Railway u
 The Dockerfile is pinned to this official image:
 
 ```text
-nousresearch/hermes-agent:v2026.7.20@sha256:f7b35053268f532f98955195c909f15a230470fbcbdacaa9fdecb95707dad04a
+nousresearch/hermes-agent:v2026.7.30@sha256:b869e64d6496d4763d5e4fb675b5f504cb23b0e35ec9b790481a56118602b10f
 ```
 
-`v2026.7.20` (Hermes Agent v0.19.0, "The Quicksilver Release") is the first tagged release confirmed to carry the password-only dashboard auth fix — `/auth/login` now redirects password-capable providers straight to `/login` instead of crashing `BasicAuthProvider` through the OAuth `start_login()` path.
+`v2026.7.30` is the currently reviewed production release. The tag and registry digest are both pinned; `latest` is never used.
 
 Use these service settings:
 
@@ -20,7 +20,7 @@ Use these service settings:
 |---|---|
 | Start command | `/usr/local/bin/hermes-railway-entrypoint gateway run` |
 | Volume mount | `/data` |
-| Public port | `8080` |
+| Public port | `3000` |
 | Health-check path | `/api/status` |
 | Replicas | `1` |
 
@@ -29,12 +29,12 @@ Railway continues building this GitHub repository so existing template consumers
 ### Variables
 
 ```dotenv
-PORT=8080
+PORT=3000
 ADMIN_USERNAME=admin
-ADMIN_PASSWORD=<generated-password>
+ADMIN_PASSWORD=<required-secret>
 ```
 
-The compatibility entrypoint maps the existing `ADMIN_USERNAME` and sealed `ADMIN_PASSWORD` values to the official dashboard variables before starting `/init`. Existing deployments therefore keep the same login without adding, copying, revealing, or re-entering credentials. It does not modify `config.yaml`. If `ADMIN_PASSWORD` is absent, it generates and logs a password as the previous template did.
+The compatibility entrypoint maps the existing `ADMIN_USERNAME` and sealed `ADMIN_PASSWORD` values to the official dashboard variables before starting `/init`. Existing deployments therefore keep the same login without adding, copying, revealing, or re-entering credentials. It does not modify `config.yaml`. The service fails closed if no dashboard password is configured; credentials are never generated or printed in deployment logs.
 
 For zero-interaction migration, a stable 32-byte dashboard session-signing secret is derived from `ADMIN_PASSWORD`. Derivation supports legacy passwords shorter than Hermes's 16-byte minimum signing-key length while preserving the existing login. After migration, operators may add `HERMES_DASHBOARD_BASIC_AUTH_SECRET` as an independent sealed value containing at least 32 random bytes. Rotating only this secret logs dashboard users out; it does not change the dashboard password or Hermes data. Neither the password nor the derived secret is written to `config.yaml`.
 
@@ -55,6 +55,6 @@ Provider credentials, messaging channels, models, skills, profiles, and gateway 
 
 ## Upgrading Hermes
 
-Update the pinned release and digest in `Dockerfile` deliberately after reviewing the upstream [release notes](https://github.com/NousResearch/hermes-agent/releases) and validating the new image. Do not use `latest`. Because the template remains GitHub-backed, merging an upgrade to the default branch notifies existing template consumers.
+Update the pinned release and digest in `Dockerfile` through a pull request after reviewing the upstream [release notes](https://github.com/NousResearch/hermes-agent/releases) and validating the registry digest. Do not use `latest`. The validation workflow must pass before merging to the protected production branch.
 
 See the official [Hermes Docker documentation](https://hermes-agent.nousresearch.com/docs/user-guide/docker) for image behavior and configuration details.
