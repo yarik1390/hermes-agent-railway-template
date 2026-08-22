@@ -12,4 +12,4 @@ ENV HOME=/data \
 
 WORKDIR /data
 EXPOSE 20128
-CMD ["sh", "-c", "exec omniroute --port ${PORT:-20128}"]
+CMD ["sh", "-c", "if [ \"${MIGRATION_HOLD:-0}\" = \"1\" ]; then exec node -e \"require('http').createServer((q,r)=>r.end('migration-hold')).listen(Number(process.env.PORT||20128),'0.0.0.0')\"; else exec omniroute --port ${PORT:-20128}; fi"]
