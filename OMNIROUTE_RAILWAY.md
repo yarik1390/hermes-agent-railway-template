@@ -2,7 +2,7 @@
 
 Pinned migration image for the central OmniRoute gateway.
 
-- OmniRoute: `3.8.48` (matches the Hetzner source during migration)
+- OmniRoute: `3.8.49` (stable; supersedes the Hetzner-source 3.8.48 migration image)
 - Node: `22.22.2-bookworm-slim`, pinned by OCI index digest
 - Persistent volume mount: `/data`
 - Runtime state: `/data/.omniroute`
